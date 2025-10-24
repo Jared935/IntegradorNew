@@ -8,7 +8,7 @@ import 'sales_screen.dart';
 import 'tickets_screen.dart';  
 import 'users_screen.dart';    
 import 'widgets/info_card.dart';
-import 'login_screen.dart'; 
+import 'admin_login.dart'; 
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -89,6 +89,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Simple fallback LoginScreen widget in case the imported admin_login.dart
+// doesn't define LoginScreen. This prevents the compile error.
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Login')),
+      body: const Center(child: Text('Login screen placeholder')),
     );
   }
 }

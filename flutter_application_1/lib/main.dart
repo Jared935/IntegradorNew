@@ -1,55 +1,105 @@
-// main.dart
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-// Importa el Core de Firebase para la inicialización
+// Firebase
 import 'package:firebase_core/firebase_core.dart';
+// Asumiendo que firebase_options.dart está en la raíz de lib o del proyecto
+import 'firebase_options.dart';
 
-// Importa el archivo de configuración generado por FlutterFire
-import 'firebase_options.dart'; 
+// Providers de la app de cliente (WolfCoffe)
+import 'package:flutter_application_1/providers/products_provider.dart';
+import 'package:flutter_application_1/providers/cart_provider.dart';
 
-// Importa la pantalla de inicio de sesión, que será la primera en mostrarse
-import 'login_screen.dart'; 
+// Pantalla de inicio (Login del Cliente)
+import 'package:flutter_application_1/screens/login_screen.dart';
 
+// --- Importa TODAS las pantallas que usas en las rutas ---
 
-// La función main ahora es 'async' para poder esperar a que Firebase se inicialice
+// Pantallas Cliente (WolfCoffe)
+import 'package:flutter_application_1/screens/menu_screen.dart';
+import 'package:flutter_application_1/screens/register_screen.dart';
+import 'package:flutter_application_1/options/cart_screen.dart';
+import 'package:flutter_application_1/screens/search_screen.dart';
+import 'package:flutter_application_1/screens/profile_screen.dart'; // Renombrado a CustomerProfileScreen
+import 'package:flutter_application_1/screens/settings_screen.dart';
+import 'package:flutter_application_1/screens/categorys_screen/desayunos_screes.dart';
+import 'package:flutter_application_1/screens/categorys_screen/almuerzos_screen.dart';
+import 'package:flutter_application_1/screens/categorys_screen/comidas_screen.dart';
+import 'package:flutter_application_1/screens/categorys_screen/bebidas_screen.dart';
+import 'package:flutter_application_1/screens/categorys_screen/postres_screen.dart';
+
+// Pantallas Admin
+import 'package:flutter_application_1/admin_login.dart';
+import 'package:flutter_application_1/dashboard_screen.dart';
+// Importa otras pantallas admin si necesitas navegar directamente a ellas
+// import 'package:flutter_application_1/admin_app/users_screen.dart'; // Renombrado a AdminUsersScreen?
+// import 'package:flutter_application_1/admin_app/products_screen.dart'; // Renombrado a AdminProductsScreen?
+
 void main() async {
-  // 1. Asegura que los componentes de Flutter estén listos antes de usar plugins
-  WidgetsFlutterBinding.ensureInitialized(); 
-  
-  // 2. 💥 CONEXIÓN A FIREBASE 💥
-  // Esta línea es la más importante: conecta tu app con tu proyecto de Firebase
-  // usando la configuración del archivo 'firebase_options.dart'.
+  WidgetsFlutterBinding.ensureInitialized();
+  // Inicializa Firebase para el panel de admin
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
-  ); 
-
-  // 3. Inicia la aplicación de Flutter
-  runApp(const AdminApp());
+  );
+  runApp(const CombinedApp());
 }
 
-// El widget principal de tu aplicación
-class AdminApp extends StatelessWidget {
-  const AdminApp({super.key});
+class CombinedApp extends StatelessWidget {
+  const CombinedApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      // Título de la aplicación que se ve en la multitarea del sistema operativo
-      title: 'Panel Administrativo Flutter',
+    // Configura los Providers para WolfCoffe
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ProductsProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+      ],
+      child: MaterialApp(
+        title: 'WolfCoffe & Admin Panel',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.brown,
+          useMaterial3: true,
+          scaffoldBackgroundColor: Colors.orange[50],
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.brown,
+            foregroundColor: Colors.white,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+        // La pantalla inicial es el Login del Cliente
+        home: const CustomerLoginScreen(), // Usa la clase renombrada
 
-      // Oculta la cinta de "Debug" en la esquina superior derecha
-      debugShowCheckedModeBanner: false,
+        // Define las rutas nombradas para la navegación
+        routes: {
+          // Rutas Cliente
+          '/customer_login': (context) => const CustomerLoginScreen(), // Ruta para el login cliente
+          '/register': (context) => const RegisterScreen(),
+          '/menu': (context) => const MainMenuScreen(),
+          '/cart': (context) => const CartScreen(),
+          '/search': (context) => const SearchScreen(),
+          '/profile': (context) => const ProfileScreen(), // Usa la clase renombrada
+          '/settings': (context) => const SettingsScreen(),
+          '/desayunos': (context) => const DesayunosScreen(),
+          '/almuerzos': (context) => const AlmuerzosScreen(),
+          '/comidas': (context) => const ComidasScreen(),
+          '/bebidas': (context) => const BebidasScreen(),
+          '/postres': (context) => const PostresScreen(),
 
-      // Define el tema visual de la aplicación
-      theme: ThemeData(
-        primarySwatch: Colors.indigo,
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.grey[100],
+          // Rutas Admin
+          '/admin_login': (context) => const AdminLoginScreen(), // Ruta para el login admin
+          '/admin_dashboard': (context) => const DashboardScreen(),
+          // Puedes añadir más rutas admin aquí si las necesitas
+          // '/admin_users': (context) => const AdminUsersScreen(),
+        },
       ),
-
-      // La primera pantalla que se mostrará al abrir la app
-      home: const LoginScreen(), 
     );
   }
 }
+
