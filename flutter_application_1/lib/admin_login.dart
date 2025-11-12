@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 // Importa el servicio de storage y modelos de datos del admin app
+// Asegúrate de que estos archivos existan en la ubicación correcta
 import 'package:flutter_application_1/admin_storage_service.dart';
 import 'package:flutter_application_1/admin_data_models.dart' as admin_models;
 
@@ -10,25 +11,35 @@ import 'package:flutter_application_1/dashboard_screen.dart';
 
 // Servicio de autenticación para el Admin, usando AdminStorageService
 class AdminAuthService {
-  static get AdminStorageService => null;
+  // Ya no se necesita el getter incorrecto
 
   static Future<bool> login(String email, String password) async {
-    // Obtenemos una única instantánea de los usuarios admin actuales
-    final userList = await AdminStorageService.streamUsers().first; // Usa AdminStorageService
     try {
+      // Obtenemos una única instantánea de los usuarios admin actuales
+      final userList = await AdminStorageService.streamUsers()
+          .first; // Usa AdminStorageService
+
+      // Buscamos al usuario por su email
       final user = userList.firstWhere((u) => u.email == email);
-      // Validar también que el rol sea 'Admin' (opcional pero recomendado)
-      // return user.password == password && user.role == 'Admin';
-      return user.password == password; // Compara la contraseña real
+
+      // Validamos la contraseña Y que el rol sea 'Admin'
+      return user.password == password && user.role == 'Admin';
     } catch (e) {
-      return false; // Usuario no encontrado
+      // Si 'firstWhere' no encuentra un usuario o hay otro error, el login falla.
+      print("Error en login: $e"); // Ayuda a depurar si algo sale mal
+      return false;
     }
   }
 
-  // Verificar si hay usuarios (puede ser útil para registrar el primer admin)
-   static Future<bool> hasUsers() async {
-    final userList = await AdminStorageService.streamUsers().first;
-    return userList.isNotEmpty;
+  // Verificar si hay usuarios (puede ser útil si necesitas una lógica inicial)
+  static Future<bool> hasUsers() async {
+    try {
+      final userList = await AdminStorageService.streamUsers().first;
+      return userList.isNotEmpty;
+    } catch (e) {
+      print("Error al verificar usuarios: $e");
+      return false; // Asume que no hay usuarios si hay un error
+    }
   }
 }
 
@@ -43,22 +54,24 @@ class AdminLoginScreen extends StatefulWidget {
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  // El _nameController no parece necesario aquí si solo es login
-  // final _nameController = TextEditingController();
 
   String _errorMessage = '';
   bool _isLoading = false;
 
-  // Ya no necesitamos _hasUsers aquí si no permitimos registro desde esta pantalla
-
   void _handleAdminLogin() async {
-    setState(() { _isLoading = true; _errorMessage = ''; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() { _errorMessage = 'Ingrese email y contraseña.'; _isLoading = false; });
+      setState(() {
+        _errorMessage = 'Ingrese email y contraseña.';
+        _isLoading = false;
+      });
       return;
     }
 
@@ -70,30 +83,46 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       // Navega al Dashboard de Admin
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()), // Navega al Dashboard
+        MaterialPageRoute(
+          builder: (context) => const DashboardScreen(),
+        ), // Asegúrate que DashboardScreen sea la correcta
       );
-      // O usa ruta nombrada: Navigator.pushReplacementNamed(context, '/admin_dashboard');
     } else {
-      setState(() { _errorMessage = 'Credenciales de administrador inválidas.'; _isLoading = false; });
+      setState(() {
+        _errorMessage = 'Credenciales de administrador inválidas.';
+        _isLoading = false;
+      });
     }
   }
 
-  // Quitamos _handleRegister si el admin no se registra desde aquí
-  // void _handleRegister() { ... }
-
   InputDecoration _buildInputDecoration({required String hintText}) {
-     // ... (Tu código _buildInputDecoration no cambia) ...
-    return InputDecoration( hintText: hintText, contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8), filled: true, fillColor: Colors.white, border: OutlineInputBorder( borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: Colors.grey.shade400, width: 1), ), enabledBorder: OutlineInputBorder( borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: Colors.grey.shade400, width: 1), ), focusedBorder: OutlineInputBorder( borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Colors.blue, width: 2), ), );
+    return InputDecoration(
+      hintText: hintText,
+      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: Colors.grey.shade400, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: Colors.grey.shade400, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Colors.blue, width: 2),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Reutilizamos el build de tu login estilo GitHub original
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
-      appBar: AppBar( // Añadimos un AppBar para poder volver
+      appBar: AppBar(
         title: const Text('Acceso Administrador'),
-        backgroundColor: Colors.indigo, // O el color que prefieras
+        backgroundColor: Colors.indigo,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -103,58 +132,127 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                const Icon(Icons.admin_panel_settings, size: 48, color: Colors.black), // Icono Admin
+                const Icon(
+                  Icons.admin_panel_settings,
+                  size: 48,
+                  color: Colors.black,
+                ),
                 const SizedBox(height: 20),
-                const Text('Acceso Administrativo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500, color: Colors.black)),
+                const Text(
+                  'Acceso Administrativo',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                ),
                 const SizedBox(height: 15),
                 Card(
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade300, width: 1)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: Colors.grey.shade300, width: 1),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const Text('Correo Electrónico Admin', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const Text(
+                          'Correo Electrónico Admin',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                         const SizedBox(height: 8),
-                        TextField(controller: _emailController, keyboardType: TextInputType.emailAddress, decoration: _buildInputDecoration(hintText: 'Ingresa tu email de admin')),
+                        TextField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: _buildInputDecoration(
+                            hintText: 'Ingresa tu email de admin',
+                          ),
+                        ),
                         const SizedBox(height: 15),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Contraseña Admin', style: TextStyle(fontWeight: FontWeight.w600)),
-                            TextButton(onPressed: () {}, style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap), child: const Text('¿Olvidaste?', style: TextStyle(fontSize: 12, color: Colors.blue))),
+                            const Text(
+                              'Contraseña Admin',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                /* Lógica para recuperar contraseña si es necesario */
+                              },
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(0, 0),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                '¿Olvidaste?',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        TextField(controller: _passwordController, obscureText: true, decoration: _buildInputDecoration(hintText: 'Ingresa tu contraseña')),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: _buildInputDecoration(
+                            hintText: 'Ingresa tu contraseña',
+                          ),
+                        ),
                         const SizedBox(height: 20),
                         if (_errorMessage.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 15),
-                            child: Text(_errorMessage, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                            child: Text(
+                              _errorMessage,
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         SizedBox(
                           width: double.infinity,
                           height: 40,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleAdminLogin, // Llama a la función de login admin
+                            onPressed: _isLoading ? null : _handleAdminLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade800, // Color del botón de GitHub
+                              backgroundColor: Colors.green.shade800,
                               foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
                               elevation: 0,
                             ),
-                            child: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Iniciar Sesión Admin', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Iniciar Sesión Admin',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                 // Quitamos la opción de registrarse desde aquí
-                 // const SizedBox(height: 20),
-                 // Container(...)
+                // Se quita la opción de registrarse desde aquí
               ],
             ),
           ),
