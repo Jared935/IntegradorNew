@@ -1,49 +1,7 @@
-// users_screen.dart
 import 'package:flutter/material.dart';
+// Asegúrate de que estas importaciones apunten a tus archivos correctos
 import 'storage_service.dart';
 import 'data_models.dart' as data_models;
-
-class User {
-  String name;
-  String email;
-  String role;
-  String password; // CAMPO AÑADIDO
-  User(this.name, this.email, this.role, this.password);
-}
-
-class UsersDataService {
-  static final List<User> _users = [];
-
-  static List<User> get userList => _users;
-  static int get userCount => _users.length;
-
-  static final Stream<List<User>> userStream = StorageService.streamUsers().map((loadedUsers) {
-    _users.clear();
-    // MODIFICADO para incluir la contraseña
-    final screenUsers = loadedUsers.map((u) => User(u.name, u.email, u.role, u.password)).toList();
-    _users.addAll(screenUsers);
-    return screenUsers;
-  });
-
-  static Future<void> initialize() async {}
-
-  static Future<void> save() async {
-    final storageUsers = _users.map((u) => data_models.User(
-      id: '',
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      password: u.password, // MODIFICADO para guardar la contraseña real
-    )).toList();
-    await StorageService.saveUsers(storageUsers);
-  }
-
-  // MODIFICADO para aceptar la contraseña
-  static void registerUser(String name, String email, String role, String password) {
-    _users.add(User(name, email, role, password));
-    save();
-  }
-}
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -54,6 +12,7 @@ class UsersScreen extends StatefulWidget {
 
 class _UsersScreenState extends State<UsersScreen> {
 
+  // Función auxiliar para colores de roles
   Color _getRoleColor(String role) {
     switch (role) {
       case 'Admin': return Colors.green;
@@ -62,65 +21,70 @@ class _UsersScreenState extends State<UsersScreen> {
       default: return Colors.grey;
     }
   }
-
-  void _deleteUser(int index) {
-    UsersDataService._users.removeAt(index);
-    UsersDataService.save();
+  
+  // Función para borrar usuario de la base de datos
+  void _deleteUser(String userId) {
+    StorageService.deleteUser(userId);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Usuario eliminado')),
+    );
   }
-
+  
+  // Función para mostrar el diálogo y añadir usuario
   void _addUser() {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController emailController = TextEditingController();
-    final TextEditingController passwordController = TextEditingController(); // CONTROLADOR AÑADIDO
-    String selectedRole = 'Cliente';
+    final TextEditingController passwordController = TextEditingController();
+    String selectedRole = 'Cliente'; // Valor por defecto
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Añadir Nuevo Usuario'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Nombre Completo'),
-              ),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(labelText: 'Correo Electrónico'),
-              ),
-              // CAMPO DE CONTRASEÑA AÑADIDO
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Contraseña'),
-              ),
-              const SizedBox(height: 15),
-              StatefulBuilder(
-                builder: (BuildContext context, StateSetter setStateDropdown) {
-                  return DropdownButtonFormField<String>(
-                    value: selectedRole,
-                    decoration: const InputDecoration(labelText: 'Rol'),
-                    items: <String>['Admin', 'Editor', 'Cliente']
-                        .map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      if (newValue != null) {
-                        setStateDropdown(() {
-                          selectedRole = newValue;
-                        });
-                      }
-                    },
-                  );
-                },
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Nombre Completo'),
+                ),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Correo Electrónico'),
+                ),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Contraseña'),
+                ),
+                const SizedBox(height: 15),
+                StatefulBuilder(
+                  builder: (BuildContext context, StateSetter setStateDropdown) {
+                    return DropdownButtonFormField<String>(
+                      value: selectedRole,
+                      decoration: const InputDecoration(labelText: 'Rol'),
+                      items: <String>['Admin', 'Editor', 'Cliente']
+                          .map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setStateDropdown(() {
+                            selectedRole = newValue;
+                          });
+                        }
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
           actions: <Widget>[
             TextButton(
@@ -129,18 +93,32 @@ class _UsersScreenState extends State<UsersScreen> {
             ),
             FilledButton(
               onPressed: () {
-                final name = nameController.text;
-                final email = emailController.text;
-                final password = passwordController.text; // VALOR OBTENIDO
+                final name = nameController.text.trim();
+                final email = emailController.text.trim();
+                final password = passwordController.text.trim();
 
-                // VALIDACIÓN MODIFICADA
                 if (name.isNotEmpty && email.isNotEmpty && password.isNotEmpty) {
-                  // LLAMADA A FUNCIÓN MODIFICADA
-                  UsersDataService.registerUser(name, email, selectedRole, password);
+                  // 1. Crear el objeto usuario
+                  final newUser = data_models.User(
+                    id: '', // Firestore pone el ID
+                    name: name,
+                    email: email,
+                    role: selectedRole,
+                    password: password,
+                  );
+
+                  // 2. Guardar en Firebase usando StorageService
+                  StorageService.addUser(newUser); 
+                  
                   Navigator.of(context).pop();
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Usuario $name añadido exitosamente')),
+                  );
                 } else {
+                  // Validación simple
                    ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Error: Todos los campos son obligatorios.'))
+                    const SnackBar(content: Text('Por favor completa todos los campos')),
                   );
                 }
               },
@@ -158,10 +136,12 @@ class _UsersScreenState extends State<UsersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestión de Usuarios Registrados'),
-        backgroundColor: Colors.green,
+        backgroundColor: Colors.green, // Color verde como en tu imagen
+        foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<List<User>>(
-        stream: UsersDataService.userStream,
+      // Usamos StreamBuilder para escuchar la base de datos en tiempo real
+      body: StreamBuilder<List<data_models.User>>(
+        stream: StorageService.streamUsers(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -169,12 +149,13 @@ class _UsersScreenState extends State<UsersScreen> {
           if (snapshot.hasError) {
             return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
           }
+          
           final liveUsers = snapshot.data ?? [];
-
+          
           if (liveUsers.isEmpty) {
             return const Center(child: Text('No hay usuarios registrados.'));
           }
-
+          
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: liveUsers.length,
@@ -182,54 +163,64 @@ class _UsersScreenState extends State<UsersScreen> {
               final user = liveUsers[index];
               final Color roleColor = _getRoleColor(user.role);
 
-              return Dismissible(
-                key: Key(user.email),
-                direction: DismissDirection.endToStart,
-                background: Container(
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 20.0),
-                  color: Colors.red,
-                  child: const Icon(Icons.delete_forever, color: Colors.white),
-                ),
-                onDismissed: (direction) {
-                  _deleteUser(index);
-                },
-
-                child: Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: ListTile(
-                    leading: const Icon(Icons.person, color: Colors.green),
-                    title: Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(user.email),
-
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          margin: const EdgeInsets.only(right: 10),
-                          decoration: BoxDecoration(
-                            color: roleColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(5),
+              return Card(
+                elevation: 2,
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  leading: const Icon(Icons.person, color: Colors.green),
+                  title: Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(user.email),
+                      // Opcional: Mostrar la contraseña (no recomendado en producción)
+                      Text(user.password, style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                    ],
+                  ),
+                  
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        margin: const EdgeInsets.only(right: 10),
+                        decoration: BoxDecoration(
+                          color: roleColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          user.role,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: roleColor,
+                            fontSize: 12,
                           ),
-                          child: Text(
-                            user.role,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: roleColor,
-                              fontSize: 12,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          // Diálogo de confirmación antes de borrar
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text("¿Eliminar Usuario?"),
+                              content: Text("Vas a eliminar a ${user.name}. Esta acción no se puede deshacer."),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _deleteUser(user.id); // Llama a borrar con el ID real
+                                  }, 
+                                  child: const Text("Eliminar", style: TextStyle(color: Colors.red)),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () {
-                            _deleteUser(index);
-                          },
-                        ),
-                      ],
-                    ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
               );

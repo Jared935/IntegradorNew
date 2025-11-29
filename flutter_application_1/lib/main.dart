@@ -1,47 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-// --- Firebase ---
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // Asegúrate de que este archivo exista en lib/
+import 'firebase_options.dart';
 
-// --- Providers (WolfCoffe Cliente) ---
+// --- Providers ---
 import 'package:flutter_application_1/providers/products_provider.dart';
 import 'package:flutter_application_1/providers/cart_provider.dart';
 
-// --- Pantallas Cliente (WolfCoffe) ---
-import 'package:flutter_application_1/screens/login_screen.dart'; // CustomerLoginScreen
+// --- Pantallas Cliente ---
+import 'package:flutter_application_1/screens/login_screen.dart';
 import 'package:flutter_application_1/screens/register_screen.dart';
-import 'package:flutter_application_1/screens/menu_screen.dart'; // MainMenuScreen
+import 'package:flutter_application_1/screens/menu_screen.dart';
 import 'package:flutter_application_1/options/cart_screen.dart';
 import 'package:flutter_application_1/screens/search_screen.dart';
 import 'package:flutter_application_1/screens/profile_screen.dart';
 import 'package:flutter_application_1/screens/settings_screen.dart';
 
-// --- Categorías Cliente ---
+// --- Categorías ---
 import 'package:flutter_application_1/screens/categorys_screen/desayunos_screes.dart';
 import 'package:flutter_application_1/screens/categorys_screen/almuerzos_screen.dart';
 import 'package:flutter_application_1/screens/categorys_screen/comidas_screen.dart';
 import 'package:flutter_application_1/screens/categorys_screen/bebidas_screen.dart';
 import 'package:flutter_application_1/screens/categorys_screen/postres_screen.dart';
 
-// --- Pantallas Admin (Panel) ---
-import 'package:flutter_application_1/admin_login.dart'; // AdminLoginScreen
-import 'package:flutter_application_1/dashboard_screen.dart'; // DashboardScreen
+// --- Pantallas Admin ---
+import 'package:flutter_application_1/admin_login.dart';
+import 'package:flutter_application_1/dashboard_screen.dart';
+// ASEGÚRATE de importar tus pantallas de gestión administrativa aquí:
+import 'package:flutter_application_1/users_screen.dart';
+import 'package:flutter_application_1/sales_screen.dart'; 
+import 'package:flutter_application_1/products_screen.dart';
+import 'package:flutter_application_1/tickets_screen.dart';
 
-// ============================================================================
-// PUNTO DE ENTRADA PRINCIPAL
-// ============================================================================
 void main() async {
-  // 1. Asegura la inicialización del motor de Flutter
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 2. Inicializa Firebase con la configuración de la plataforma actual
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  // 3. Arranca la aplicación combinada
   runApp(const CombinedApp());
 }
 
@@ -50,7 +45,6 @@ class CombinedApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Usamos MultiProvider para inyectar los estados globales de la app de cliente
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ProductsProvider()),
@@ -58,9 +52,7 @@ class CombinedApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'WolfCoffe & Admin Panel',
-        debugShowCheckedModeBanner: false, // Quita la etiqueta DEBUG
-
-        // --- Tema Global ---
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.brown,
           useMaterial3: true,
@@ -70,21 +62,12 @@ class CombinedApp extends StatelessWidget {
             foregroundColor: Colors.white,
             elevation: 4,
           ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-          ),
         ),
-
-        // --- Pantalla Inicial ---
-        // La app arranca por defecto en el login de clientes
+        
         home: const CustomerLoginScreen(),
 
-        // --- Mapa de Rutas ---
         routes: {
-          // -> Rutas de Cliente
+          // --- Cliente ---
           '/customer_login': (context) => const CustomerLoginScreen(),
           '/register': (context) => const CustomerRegisterScreen(),
           '/menu': (context) => const MainMenuScreen(),
@@ -92,17 +75,23 @@ class CombinedApp extends StatelessWidget {
           '/search': (context) => const SearchScreen(),
           '/profile': (context) => const ProfileScreen(),
           '/settings': (context) => const SettingsScreen(),
-
-          // -> Rutas de Categorías
+          
+          // --- Categorías ---
           '/desayunos': (context) => const DesayunosScreen(),
           '/almuerzos': (context) => const AlmuerzosScreen(),
           '/comidas': (context) => const ComidasScreen(),
           '/bebidas': (context) => const BebidasScreen(),
           '/postres': (context) => const PostresScreen(),
 
-          // -> Rutas de Admin
+          // --- Admin ---
           '/admin_login': (context) => const AdminLoginScreen(),
-          '/admin_dashboard': (context) => const DashboardScreen(),
+          '/dashboard': (context) => const DashboardScreen(),
+          
+          // --- NUEVAS RUTAS DE GESTIÓN ADMIN ---
+          '/admin_users': (context) => const UsersScreen(),
+          '/admin_products': (context) => const ProductsScreen(),
+          '/admin_sales': (context) => const SalesScreen(),
+          '/admin_tickets': (context) => const TicketsScreen(),
         },
       ),
     );

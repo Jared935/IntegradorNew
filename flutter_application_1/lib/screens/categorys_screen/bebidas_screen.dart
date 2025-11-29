@@ -1,266 +1,61 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:flutter_application_1/providers/products_provider.dart';
-import 'package:flutter_application_1/providers/cart_provider.dart';
-import 'package:flutter_application_1/models/product.dart';
+import 'package:flutter_application_1/data_models.dart';
+import 'package:flutter_application_1/storage_service.dart';
+
 class BebidasScreen extends StatelessWidget {
   const BebidasScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final productsProvider = Provider.of<ProductsProvider>(context);
-    final cartProvider = Provider.of<CartProvider>(context);
-    final bebidas = productsProvider.getProductsByCategory('Bebidas');
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Bebidas"),
+        title: const Text('Bebidas'),
         backgroundColor: Colors.brown,
       ),
-      body:
-          bebidas.isEmpty
-              ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.local_cafe, size: 80, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text(
-                      'No hay bebidas disponibles',
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              )
-              : ListView.builder(
-                itemCount: bebidas.length,
-                itemBuilder: (context, index) {
-                  final product = bebidas[index];
-                  return _buildProductCard(context, product, cartProvider);
-                },
+      body: StreamBuilder<List<Product>>(
+        // 1. Filtra por "Bebida"
+        stream: StorageService.streamProductsByCategory('Bebida'),
+        
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error al cargar productos: ${snapshot.error}'));
+          }
+          final products = snapshot.data ?? [];
+          if (products.isEmpty) {
+            return const Center(
+              child: Text(
+                'No hay bebidas disponibles por el momento.',
+                style: TextStyle(fontSize: 18, color: Colors.grey),
               ),
-    );
-  }
-
-  Widget _buildProductCard(
-    BuildContext context,
-    Product product,
-    CartProvider cartProvider,
-  ) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ListTile(
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: _getDrinkColor(product.name),
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: Center(
-            child: Text(product.imageUrl, style: const TextStyle(fontSize: 20)),
-          ),
-        ),
-        title: Text(
-          product.name,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: product.available ? Colors.black : Colors.grey,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              product.description,
-              style: TextStyle(
-                color: product.available ? Colors.grey : Colors.grey[400],
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '\$${product.price.toStringAsFixed(2)}',
-              style: TextStyle(
-                color: product.available ? Colors.green : Colors.grey,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (!product.available)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'AGOTADO',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+            );
+          }
+          
+          return ListView.builder(
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              final product = products[index];
+              return Card(
+                margin: const EdgeInsets.all(10),
+                elevation: 4,
+                child: ListTile(
+                  leading: const Icon(Icons.local_cafe, color: Colors.brown),
+                  title: Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Stock disponible: ${product.stock}'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add_shopping_cart, color: Colors.green),
+                    onPressed: () {
+                      // Lógica para añadir al carrito
+                    },
                   ),
                 ),
-              ),
-          ],
-        ),
-        trailing:
-            product.available
-                ? IconButton(
-                  icon: const Icon(
-                    Icons.add_shopping_cart,
-                    color: Colors.orange,
-                  ),
-                  onPressed: () {
-                    cartProvider.addProduct(product);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${product.name} agregado al carrito'),
-                        backgroundColor: Colors.green,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                )
-                : const Icon(Icons.remove_shopping_cart, color: Colors.grey),
-        onTap: () {
-          _showProductDetails(context, product, cartProvider);
+              );
+            },
+          );
         },
       ),
-    );
-  }
-
-  Color _getDrinkColor(String drinkName) {
-    if (drinkName.toLowerCase().contains('cafe') ||
-        drinkName.toLowerCase().contains('capuchino')) {
-      return Colors.brown[100]!;
-    } else if (drinkName.toLowerCase().contains('chocolate')) {
-      return Colors.brown[300]!;
-    } else if (drinkName.toLowerCase().contains('naranja')) {
-      return Colors.orange[100]!;
-    } else {
-      return Colors.blue[100]!;
-    }
-  }
-
-  void _showProductDetails(
-    BuildContext context,
-    Product product,
-    CartProvider cartProvider,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (ctx) => Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: _getDrinkColor(product.name),
-                        borderRadius: BorderRadius.circular(40),
-                      ),
-                      child: Center(
-                        child: Text(
-                          product.imageUrl,
-                          style: const TextStyle(fontSize: 32),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.name,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '\$${product.price.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Descripción:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  product.description,
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Icon(
-                      product.available ? Icons.check_circle : Icons.cancel,
-                      color: product.available ? Colors.green : Colors.red,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      product.available ? 'Disponible' : 'Agotado',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: product.available ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                if (product.available)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        cartProvider.addProduct(product);
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${product.name} agregado al carrito',
-                            ),
-                            backgroundColor: Colors.green,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.add_shopping_cart),
-                      label: const Text(
-                        'Agregar al Carrito',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
     );
   }
 }

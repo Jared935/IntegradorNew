@@ -1,45 +1,12 @@
-// tickets_screen.dart
 import 'package:flutter/material.dart';
 import 'storage_service.dart';
 import 'data_models.dart' as data_models;
-
-class Ticket {
-  String id;
-  String subject;
-  String status; // 'Abierto', 'Pendiente', 'Cerrado'
-  String orderId;
-  Ticket(this.id, this.subject, this.status, this.orderId);
-}
-
-class TicketsDataService {
-  static final List<Ticket> _tickets = [];
-  
-  static List<Ticket> get ticketList => _tickets;
-
-  static int get pendingTicketsCount {
-    return _tickets.where((t) => t.status != 'Cerrado').length;
-  }
-
-  static final Stream<List<Ticket>> ticketStream = StorageService.streamTickets().map((loadedTickets) {
-    _tickets.clear();
-    final screenTickets = loadedTickets.map((t) => Ticket(t.id, t.subject, t.status, t.orderId)).toList();
-    _tickets.addAll(screenTickets);
-    return screenTickets;
-  });
-
-  static Future<void> initialize() async {}
-  
-  static Future<void> save() async {
-    final storageTickets = _tickets.map((t) => data_models.Ticket(id: t.id, subject: t.subject, status: t.status, orderId: t.orderId)).toList();
-    await StorageService.saveTickets(storageTickets);
-  }
-}
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
 
   @override
-  State<TicketsScreen> createState() => _TicketsScreenState(); 
+  State<TicketsScreen> createState() => _TicketsScreenState();
 }
 
 class _TicketsScreenState extends State<TicketsScreen> {
@@ -47,43 +14,23 @@ class _TicketsScreenState extends State<TicketsScreen> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'Abierto':
-      case 'Pendiente':
-        return Colors.red;
-      case 'Cerrado':
-        return Colors.green;
-      default:
-        return Colors.grey;
+      case 'Pendiente': return Colors.orange;
+      case 'Cerrado': 
+      case 'Terminado': return Colors.green;
+      default: return Colors.grey;
     }
   }
   
-  void _toggleTicketStatus(int index) {
-    final currentTicket = TicketsDataService._tickets[index];
-    
-    if (currentTicket.status == 'Cerrado') {
-      currentTicket.status = 'Pendiente';
-    } else {
-      currentTicket.status = 'Cerrado';
-    }
-    TicketsDataService.save(); // Guarda el cambio
+  // Función para cambiar el estado en Firebase
+  void _toggleTicketStatus(data_models.Ticket ticket) {
+    final newStatus = (ticket.status == 'Terminado' || ticket.status == 'Cerrado') 
+        ? 'Abierto' 
+        : 'Terminado';
+    StorageService.updateTicketStatus(ticket.id, newStatus);
   }
 
-  void _deleteTicket(int index) {
-    final dismissedTicket = TicketsDataService._tickets.removeAt(index);
-    
-    TicketsDataService.save(); // Guarda después de eliminar
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Ticket ${dismissedTicket.id} eliminado.'),
-        action: SnackBarAction(
-          label: 'DESHACER',
-          onPressed: () {
-            TicketsDataService._tickets.insert(index, dismissedTicket);
-            TicketsDataService.save();
-          },
-        ),
-      ),
-    );
+  void _deleteTicket(String ticketId) {
+    StorageService.deleteTicket(ticketId);
   }
 
   void _addTicket() {
@@ -104,7 +51,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
               ),
               TextField(
                 controller: orderIdController,
-                decoration: const InputDecoration(labelText: 'ID del Pedido/Artículo (Opcional)'),
+                decoration: const InputDecoration(labelText: 'ID del Pedido (Opcional)'),
               ),
             ],
           ),
@@ -115,13 +62,18 @@ class _TicketsScreenState extends State<TicketsScreen> {
             ),
             FilledButton(
               onPressed: () {
-                final subject = subjectController.text;
-                final orderId = orderIdController.text.isEmpty ? 'N/A' : orderIdController.text;
+                final subject = subjectController.text.trim();
+                final orderId = orderIdController.text.trim();
 
                 if (subject.isNotEmpty) {
-                  String newId = 'T-${(TicketsDataService._tickets.length + 1).toString().padLeft(3, '0')}';
-                  TicketsDataService._tickets.add(Ticket(newId, subject, 'Abierto', orderId));
-                  TicketsDataService.save(); // Guarda después de añadir
+                  final newTicket = data_models.Ticket(
+                    id: '',
+                    subject: subject,
+                    status: 'Abierto',
+                    orderId: orderId.isEmpty ? 'N/A' : orderId,
+                  );
+                  
+                  StorageService.addTicket(newTicket);
                   Navigator.of(context).pop();
                 }
               },
@@ -139,16 +91,17 @@ class _TicketsScreenState extends State<TicketsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tickets de Soporte'),
-        backgroundColor: Colors.orange,
+        backgroundColor: Colors.orange[800],
+        foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<List<Ticket>>(
-        stream: TicketsDataService.ticketStream,
+      body: StreamBuilder<List<data_models.Ticket>>(
+        stream: StorageService.streamTickets(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
           final liveTickets = snapshot.data ?? [];
           
@@ -161,53 +114,35 @@ class _TicketsScreenState extends State<TicketsScreen> {
             itemCount: liveTickets.length,
             itemBuilder: (context, index) {
               final ticket = liveTickets[index];
-              final color = _getStatusColor(ticket.status);
-              
-              final isFinished = ticket.status == 'Cerrado';
-              final progressText = isFinished ? 'TERMINADO' : 'EN PROGRESO';
-              final progressColor = isFinished ? Colors.green.shade800 : Colors.red.shade800;
+              final isFinished = ticket.status == 'Terminado' || ticket.status == 'Cerrado';
+              final statusColor = _getStatusColor(ticket.status);
 
               return Card(
                 elevation: 2,
                 margin: const EdgeInsets.only(bottom: 10),
-                shape: Border(left: BorderSide(color: progressColor, width: 5)),
                 child: ListTile(
-                  leading: Icon(Icons.assignment, color: color),
+                  leading: Icon(Icons.assignment, color: statusColor),
                   title: Text(ticket.subject, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('ID Ticket: ${ticket.id} | Pedido: ${ticket.orderId}'), 
+                  subtitle: Text('ID: ${ticket.id.substring(0, 6)}... | Pedido: ${ticket.orderId}'), 
                   
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: Icon(
-                          isFinished ? Icons.undo : Icons.check_circle_outline,
-                          color: isFinished ? Colors.blueGrey : Colors.green,
-                        ),
-                        tooltip: isFinished ? 'Marcar como Pendiente' : 'Marcar como Terminado',
-                        onPressed: () => _toggleTicketStatus(index),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        margin: const EdgeInsets.only(right: 10),
-                        decoration: BoxDecoration(
-                          color: progressColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(5),
+                      // Botón para alternar estado
+                      TextButton(
+                        onPressed: () => _toggleTicketStatus(ticket),
+                        style: TextButton.styleFrom(
+                           backgroundColor: statusColor.withOpacity(0.1),
                         ),
                         child: Text(
-                          progressText, 
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: progressColor,
-                            fontSize: 12,
-                          ),
+                          isFinished ? 'TERMINADO' : 'ABIERTO', 
+                          style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          _deleteTicket(index);
-                        },
+                        onPressed: () => _deleteTicket(ticket.id),
                       ),
                     ],
                   ),
@@ -221,7 +156,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
         onPressed: _addTicket,
         label: const Text('Crear Nuevo Ticket'),
         icon: const Icon(Icons.add),
-        backgroundColor: Colors.orange,
+        backgroundColor: Colors.orange[800],
+        foregroundColor: Colors.white,
       ),
     );
   }

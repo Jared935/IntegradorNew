@@ -33,6 +33,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+  flutter_animate: ^4.5.0      # Para animar TODO fácilmente (entradas, brillos)
+  animated_text_kit: ^4.2.2    # Para el efecto de texto de consola
+  glassmorphism: ^3.0.0        # Para el efecto de vidrio futurista
+
   # ... otras dependencias
   firebase_core: ^2.27.0
   

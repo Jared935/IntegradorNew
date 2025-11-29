@@ -1,68 +1,11 @@
-// dashboard_screen.dart
 import 'package:flutter/material.dart';
-// Importamos la librería de gráficos
-import 'package:fl_chart/fl_chart.dart'; 
+import 'package:fl_chart/fl_chart.dart';
+import 'storage_service.dart';
+import 'data_models.dart' as data_models;
+import 'widgets/info_card.dart'; // Asegúrate de tener este widget
 
-import 'products_screen.dart'; // Contiene ProductsDataService.totalStockCount
-import 'sales_screen.dart';    
-import 'tickets_screen.dart';  
-import 'users_screen.dart';    
-import 'widgets/info_card.dart';
-import 'admin_login.dart'; 
-
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
-
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  int _userCount = 0; 
-  double _salesAmount = 0.0; 
-  int _pendingTickets = 0; 
-  // VARIABLE: Para almacenar el stock total
-  int _totalStock = 0; 
-
-  @override
-  void initState() {
-    super.initState();
-    _updateAllCounts();
-  }
-  
-  void _updateAllCounts() {
-    if (!mounted) return; 
-
-    setState(() {
-      _userCount = UsersDataService.userCount;
-      _salesAmount = SalesDataService.totalSalesAmount;
-      _pendingTickets = TicketsDataService.pendingTicketsCount; 
-      // CLAVE: Obtener el stock total dinámico (donde marcaba el error)
-      _totalStock = ProductsDataService.totalStockCount; 
-    });
-  }
-
-  void _navigateTo(BuildContext context, Widget screen) async {
-    final isLargeScreen = MediaQuery.of(context).size.width > 600;
-
-    if (!isLargeScreen) {
-      Navigator.pop(context);
-    }
-    
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => screen),
-    );
-    
-    _updateAllCounts();
-  }
-  
-  void _logout(BuildContext context) {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (Route<dynamic> route) => false, 
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,21 +14,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard Administrativo'),
-        automaticallyImplyLeading: !isLargeScreen, 
+        automaticallyImplyLeading: !isLargeScreen,
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
       ),
-      drawer: isLargeScreen ? null : SidebarMenu(navigateTo: _navigateTo, logout: _logout),
+      drawer: isLargeScreen ? null : const SidebarMenu(),
       body: Row(
         children: [
-          if (isLargeScreen) SidebarMenu(navigateTo: _navigateTo, logout: _logout),
-          Expanded(
-            child: MainContent(
-              userCount: _userCount, 
-              salesAmount: _salesAmount, 
-              pendingTickets: _pendingTickets,
-              salesData: SalesDataService.saleList, 
-              totalStock: _totalStock, 
-              navigateTo: _navigateTo,
-            ),
+          if (isLargeScreen) const SidebarMenu(),
+          const Expanded(
+            child: MainContent(),
           ),
         ],
       ),
@@ -93,26 +31,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// Simple fallback LoginScreen widget in case the imported admin_login.dart
-// doesn't define LoginScreen. This prevents the compile error.
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
-      body: const Center(child: Text('Login screen placeholder')),
-    );
-  }
-}
-
-// SidebarMenu (Sin cambios)
+// --- MENÚ LATERAL (FUNCIONAL) ---
 class SidebarMenu extends StatelessWidget {
-  final Function(BuildContext, Widget) navigateTo;
-  final Function(BuildContext) logout; 
-  
-  const SidebarMenu({super.key, required this.navigateTo, required this.logout});
+  const SidebarMenu({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -124,36 +45,55 @@ class SidebarMenu extends StatelessWidget {
         children: [
           const DrawerHeader(
             decoration: BoxDecoration(color: Colors.indigo),
-            child: Text('Menú Admin', style: TextStyle(color: Colors.white, fontSize: 24)),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.admin_panel_settings, size: 50, color: Colors.white),
+                SizedBox(height: 10),
+                Text('Menú Admin', style: TextStyle(color: Colors.white, fontSize: 24)),
+              ],
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.dashboard),
             title: const Text('Dashboard'),
             onTap: () {
-              if (MediaQuery.of(context).size.width <= 600) {
-                Navigator.pop(context);
-              }
+              if (Scaffold.of(context).isDrawerOpen) Navigator.pop(context);
             },
           ),
+          
+          // --- BOTONES DE GESTIÓN ---
           ListTile(
             leading: const Icon(Icons.shopping_cart),
             title: const Text('Ventas'),
-            onTap: () => navigateTo(context, const SalesScreen()),
+            onTap: () {
+              if (Scaffold.of(context).isDrawerOpen) Navigator.pop(context);
+              Navigator.pushNamed(context, '/admin_sales'); // Navega a Ventas
+            },
           ),
           ListTile(
             leading: const Icon(Icons.inventory),
             title: const Text('Productos'),
-            onTap: () => navigateTo(context, const ProductsScreen()),
+            onTap: () {
+              if (Scaffold.of(context).isDrawerOpen) Navigator.pop(context);
+              Navigator.pushNamed(context, '/admin_products'); // Navega a Productos
+            },
           ),
           ListTile(
             leading: const Icon(Icons.assignment),
             title: const Text('Tickets'),
-            onTap: () => navigateTo(context, const TicketsScreen()),
+            onTap: () {
+              if (Scaffold.of(context).isDrawerOpen) Navigator.pop(context);
+              Navigator.pushNamed(context, '/admin_tickets'); // Navega a Tickets
+            },
           ),
-          ListTile( 
+          ListTile(
             leading: const Icon(Icons.people),
             title: const Text('Usuarios'),
-            onTap: () => navigateTo(context, const UsersScreen()),
+            onTap: () {
+              if (Scaffold.of(context).isDrawerOpen) Navigator.pop(context);
+              Navigator.pushNamed(context, '/admin_users'); // Navega a Usuarios
+            },
           ),
           
           const Divider(),
@@ -169,8 +109,15 @@ class SidebarMenu extends StatelessWidget {
           
           ListTile(
             leading: const Icon(Icons.exit_to_app, color: Colors.red),
-            title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red)),
-            onTap: () => logout(context), 
+            title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            onTap: () {
+              // Navega al login de CLIENTES (o donde prefieras) y borra historial
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/customer_login', 
+                (Route<dynamic> route) => false,
+              );
+            },
           ),
         ],
       ),
@@ -178,58 +125,30 @@ class SidebarMenu extends StatelessWidget {
   }
 }
 
-// MainContent (Sin cambios, ya que recibe la variable)
+// --- CONTENIDO PRINCIPAL (CLICKEABLE) ---
 class MainContent extends StatelessWidget {
-  final int userCount;
-  final double salesAmount;
-  final int pendingTickets;
-  final List<Sale> salesData; 
-  final Function(BuildContext, Widget) navigateTo;
-  final int totalStock;
-  
-  const MainContent({
-    super.key, 
-    required this.userCount, 
-    required this.salesAmount, 
-    required this.pendingTickets,
-    required this.salesData, 
-    required this.navigateTo,
-    required this.totalStock
-  });
+  const MainContent({super.key});
 
-  String _formatCurrency(double amount) {
-    return '\$${amount.toStringAsFixed(2)}';
-  }
-  
-  // FUNCIÓN PARA GENERAR LOS DATOS DE LA GRÁFICA DE BARRAS (Sin cambios)
-  List<BarChartGroupData> _buildBarGroups() {
-    final recentSales = salesData.reversed.take(4).toList();
-    
+  List<BarChartGroupData> _buildBarGroups(List<data_models.Sale> salesData) {
+    final recentSales = salesData.length > 4 ? salesData.sublist(salesData.length - 4) : salesData;
     return List.generate(recentSales.length, (i) {
       final sale = recentSales[i];
       return BarChartGroupData(
         x: i,
         barRods: [
           BarChartRodData(
-            toY: sale.amount / 100, 
+            toY: sale.amount / 100,
             color: Colors.blue.shade300,
             width: 20,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(6),
-              topRight: Radius.circular(6),
-            ),
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6)),
           ),
         ],
-        showingTooltipIndicators: [0],
       );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final maxAmount = salesData.map((s) => s.amount).fold(0.0, (a, b) => a > b ? a : b);
-    final maxChartValue = (maxAmount / 100).ceilToDouble() * 1.2; 
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -240,103 +159,103 @@ class MainContent extends StatelessWidget {
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
+          
           // Grid de Tarjetas
           GridView.count(
-            crossAxisCount: MediaQuery.of(context).size.width ~/ 300,
+            crossAxisCount: MediaQuery.of(context).size.width > 1100 ? 4 : 2,
             crossAxisSpacing: 20,
             mainAxisSpacing: 20,
             shrinkWrap: true,
+            childAspectRatio: 1.5,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              GestureDetector(
-                onTap: () => navigateTo(context, const UsersScreen()),
-                child: InfoCard(
-                  title: 'Usuarios Registrados', 
-                  value: userCount.toString(), 
-                  icon: Icons.person_add, 
-                  color: Colors.green
-                ),
+              // 1. Tarjeta Usuarios
+              StreamBuilder<List<data_models.User>>(
+                stream: StorageService.streamUsers(),
+                builder: (context, snapshot) {
+                  final count = snapshot.data?.length ?? 0;
+                  return GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/admin_users'),
+                    child: InfoCard(title: 'Usuarios Registrados', value: count.toString(), icon: Icons.person_add, color: Colors.green),
+                  );
+                },
               ),
-              GestureDetector(
-                onTap: () => navigateTo(context, const SalesScreen()),
-                child: InfoCard(
-                  title: 'Ventas Diarias', 
-                  value: _formatCurrency(salesAmount), 
-                  icon: Icons.monetization_on, 
-                  color: Colors.blue
-                ),
+              // 2. Tarjeta Ventas
+              StreamBuilder<List<data_models.Sale>>(
+                stream: StorageService.streamSales(),
+                builder: (context, snapshot) {
+                  final sales = snapshot.data ?? [];
+                  final total = sales.fold(0.0, (sum, sale) => sum + sale.amount);
+                  return GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/admin_sales'),
+                    child: InfoCard(title: 'Ventas Diarias', value: '\$${total.toStringAsFixed(2)}', icon: Icons.monetization_on, color: Colors.blue),
+                  );
+                },
               ),
-              GestureDetector(
-                onTap: () => navigateTo(context, const TicketsScreen()),
-                child: InfoCard(
-                    title: 'Tickets Pendientes', 
-                    value: pendingTickets.toString(), 
-                    icon: Icons.warning, 
-                    color: Colors.orange,
-                ),
+              // 3. Tarjeta Tickets
+              StreamBuilder<List<data_models.Ticket>>(
+                stream: StorageService.streamTickets(),
+                builder: (context, snapshot) {
+                  final tickets = snapshot.data ?? [];
+                  final count = tickets.where((t) => t.status != 'Cerrado').length;
+                  return GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/admin_tickets'),
+                    child: InfoCard(title: 'Tickets Pendientes', value: count.toString(), icon: Icons.warning, color: Colors.orange),
+                  );
+                },
               ),
-              GestureDetector(
-                onTap: () => navigateTo(context, const ProductsScreen()),
-                child: InfoCard(
-                  title: 'Productos en Stock',
-                  value: totalStock.toString(), 
-                  icon: Icons.inventory,
-                  color: Colors.red,
-                ),
+              // 4. Tarjeta Productos
+              StreamBuilder<List<data_models.Product>>(
+                stream: StorageService.streamProducts(),
+                builder: (context, snapshot) {
+                  final products = snapshot.data ?? [];
+                  final count = products.fold(0, (sum, p) => sum + p.stock);
+                  return GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/admin_products'),
+                    child: InfoCard(title: 'Productos en Stock', value: count.toString(), icon: Icons.inventory, color: Colors.red),
+                  );
+                },
               ),
             ],
           ),
+          
           const SizedBox(height: 30),
-          const Text(
-            'Gráfico de Ventas Recientes',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
-          ),
+          const Text('Gráfico de Ventas Recientes', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           
           Container(
             height: 300,
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
-            ),
-            child: BarChart(
-              BarChartData(
-                maxY: maxChartValue > 0 ? maxChartValue : 5,
-                alignment: BarChartAlignment.spaceAround,
-                barTouchData: BarTouchData(enabled: true),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      getTitlesWidget: (value, meta) {
-                        return Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text('Venta ${value.toInt() + 1}', style: const TextStyle(fontSize: 10)));
-                      },
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)]),
+            child: StreamBuilder<List<data_models.Sale>>(
+              stream: StorageService.streamSales(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                final sales = snapshot.data ?? [];
+                // Evitar división por cero o max=0
+                final maxAmount = sales.isEmpty ? 10.0 : sales.map((s) => s.amount).fold(0.0, (a, b) => a > b ? a : b);
+                final maxY = (maxAmount / 100).ceilToDouble() * 1.2;
+                final safeMaxY = maxY > 0 ? maxY : 10.0;
+
+                return BarChart(
+                  BarChartData(
+                    maxY: safeMaxY,
+                    alignment: BarChartAlignment.spaceAround,
+                    barTouchData: BarTouchData(enabled: true),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30, getTitlesWidget: (value, meta) => Padding(padding: const EdgeInsets.only(top: 8.0), child: Text('Venta ${value.toInt() + 1}', style: const TextStyle(fontSize: 10))))),
+                      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (value, meta) => Text(value == 0 ? '\$0' : '\$${(value * 100).toInt()}', style: const TextStyle(fontSize: 10)))),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
+                    borderData: FlBorderData(show: false),
+                    gridData: const FlGridData(show: true, drawVerticalLine: false),
+                    barGroups: _buildBarGroups(sales),
                   ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      getTitlesWidget: (value, meta) {
-                        if (value == 0) return const Text('\$0');
-                        return Text('\$${(value * 100).toInt()}', style: const TextStyle(fontSize: 10));
-                      },
-                    ),
-                  ),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                borderData: FlBorderData(show: false),
-                gridData: const FlGridData(show: true, drawVerticalLine: false),
-                barGroups: _buildBarGroups(), 
-              ),
+                );
+              },
             ),
           ),
         ],

@@ -1,40 +1,6 @@
-// products_screen.dart
 import 'package:flutter/material.dart';
-import 'storage_service.dart'; 
-import 'data_models.dart' as data_models; 
-
-class Product {
-  String name;
-  int stock;
-  Product(this.name, this.stock);
-}
-
-class ProductsDataService {
-  static final List<Product> _products = [];
-
-  static int get totalStockCount {
-    return _products.fold(0, (sum, product) => sum + product.stock);
-  }
-  
-  static final Stream<List<Product>> productStream = StorageService.streamProducts().map((loadedProducts) {
-    _products.clear();
-    final screenProducts = loadedProducts.map((p) => Product(p.name, p.stock)).toList();
-    _products.addAll(screenProducts);
-    return screenProducts;
-  });
-
-  static Future<void> initialize() async {}
-  
-  static Future<void> save() async {
-    final storageProducts = _products.map((p) => data_models.Product(
-      id: '', 
-      name: p.name,
-      stock: p.stock,
-    )).toList();
-    await StorageService.saveProducts(storageProducts);
-  }
-}
-
+import 'storage_service.dart';
+import 'data_models.dart' as data_models;
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -45,15 +11,20 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
 
-  void _deleteProduct(int index) {
-    ProductsDataService._products.removeAt(index);
-    ProductsDataService.save();
+  void _deleteProduct(String productId) {
+    StorageService.deleteProduct(productId);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Producto eliminado')),
+    );
   }
 
   void _addProduct() {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController stockController = TextEditingController();
-
+    // NUEVO: Controlador para categoría
+    // Si quieres una lista desplegable, podemos cambiarlo después.
+    // Por ahora, lo ponemos fijo o por defecto.
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -76,21 +47,32 @@ class _ProductsScreenState extends State<ProductsScreen> {
           actions: <Widget>[
             TextButton(
               child: const Text('Cancelar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
             ),
             FilledButton(
               onPressed: () {
-                final String name = nameController.text;
+                final String name = nameController.text.trim();
                 final int? stock = int.tryParse(stockController.text);
 
                 if (name.isNotEmpty && stock != null && stock >= 0) {
-                  ProductsDataService._products.add(Product(name, stock));
-                  ProductsDataService.save(); 
+                  // 1. Crear objeto
+                  final newProduct = data_models.Product(
+                    id: '',
+                    name: name,
+                    stock: stock,
+                    category: 'General', // Valor por defecto o agrega un input
+                    // Añade los otros campos si tu modelo los requiere (price, description...)
+                    price: 0.0,
+                    description: '',
+                  );
+
+                  // 2. Guardar en Firebase
+                  StorageService.addProduct(newProduct);
+                  
                   Navigator.of(context).pop();
-                } else {
-                  print("Datos inválidos"); 
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Producto $name añadido')),
+                  );
                 }
               },
               child: const Text('Añadir'),
@@ -106,16 +88,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestión de Productos'),
-        backgroundColor: Theme.of(context).primaryColor,
+        backgroundColor: Colors.indigo, // Ajusta a tu color preferido
+        foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<List<Product>>(
-        stream: ProductsDataService.productStream,
+      body: StreamBuilder<List<data_models.Product>>(
+        stream: StorageService.streamProducts(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
           final liveProducts = snapshot.data ?? [];
           
@@ -128,8 +111,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             itemCount: liveProducts.length,
             itemBuilder: (context, index) {
               final product = liveProducts[index];
-              
-              final bool isLowStock = product.stock < 100;
+              final bool isLowStock = product.stock < 10; // Umbral de alerta
               
               return Card(
                 elevation: 2,
@@ -137,29 +119,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.inventory_2, color: Colors.indigo),
                   title: Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('ID: #00${index + 1}'),
+                  subtitle: Text('Stock: ${product.stock}'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: isLowStock ? Colors.orange.shade100 : Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          'Stock: ${product.stock}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isLowStock ? Colors.orange.shade900 : Colors.green.shade900,
+                      if (isLowStock)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade100,
+                            borderRadius: BorderRadius.circular(4),
                           ),
+                          child: Text("BAJO", style: TextStyle(color: Colors.orange.shade900, fontSize: 10, fontWeight: FontWeight.bold)),
                         ),
-                      ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          _deleteProduct(index); 
-                        },
+                        onPressed: () => _deleteProduct(product.id),
                       ),
                     ],
                   ),
@@ -171,7 +147,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addProduct,
-        tooltip: 'Añadir Producto',
         child: const Icon(Icons.add),
       ),
     );

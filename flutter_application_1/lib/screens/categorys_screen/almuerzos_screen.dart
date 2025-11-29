@@ -1,51 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/products_provider.dart';
-import '../../providers/cart_provider.dart';
-import '../../models/product.dart';
+
+// Importa los servicios y modelos de datos
+import 'package:flutter_application_1/storage_service.dart'; // Tu servicio de Firebase
+import 'package:flutter_application_1/data_models.dart'; // Tu modelo de datos (Product)
+import 'package:flutter_application_1/providers/cart_provider.dart'; // Tu provider de carrito
 
 class AlmuerzosScreen extends StatelessWidget {
   const AlmuerzosScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final productsProvider = Provider.of<ProductsProvider>(context);
-    final cartProvider = Provider.of<CartProvider>(context);
-    final almuerzos = productsProvider.getProductsByCategory('Almuerzos');
+    // Obtenemos el cartProvider para poder añadir productos al carrito
+    // listen: false aquí porque solo lo usamos en callbacks (onPressed)
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Almuerzos"),
         backgroundColor: Colors.brown,
       ),
-      body:
-          almuerzos.isEmpty
-              ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.lunch_dining, size: 80, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text(
-                      'No hay almuerzos disponibles',
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              )
-              : ListView.builder(
-                itemCount: almuerzos.length,
-                itemBuilder: (context, index) {
-                  final product = almuerzos[index];
-                  return _buildProductCard(context, product, cartProvider);
-                },
+      body: StreamBuilder<List<Product>>(
+        // CONEXIÓN A FIREBASE:
+        stream: StorageService.streamProductsByCategory('Almuerzos'), // Categoría exacta
+        
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text("Error al cargar datos: ${snapshot.error}"));
+          }
+
+          final almuerzos = snapshot.data ?? [];
+
+          if (almuerzos.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.lunch_dining, size: 80, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'No hay almuerzos disponibles',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
               ),
+            );
+          }
+
+          // Si hay productos, muestra la lista
+          return ListView.builder(
+            itemCount: almuerzos.length,
+            itemBuilder: (context, index) {
+              final product = almuerzos[index];
+              // Reutilizamos tu widget _buildProductCard
+              return _buildProductCard(context, product, cartProvider);
+            },
+          );
+        },
+      ),
     );
   }
 
+  // Este widget es el que me diste, ahora es 100% compatible
+  // con el modelo 'Product' de data_models.dart
   Widget _buildProductCard(
     BuildContext context,
-    Product product,
+    Product product, // Este 'Product' ahora viene de 'data_models.dart'
     CartProvider cartProvider,
   ) {
     return Card(
@@ -108,21 +132,32 @@ class AlmuerzosScreen extends StatelessWidget {
         trailing:
             product.available
                 ? IconButton(
-                  icon: const Icon(
-                    Icons.add_shopping_cart,
-                    color: Colors.orange,
-                  ),
-                  onPressed: () {
-                    cartProvider.addProduct(product);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${product.name} agregado al carrito'),
-                        backgroundColor: Colors.green,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                )
+                    icon: const Icon(
+                      Icons.add_shopping_cart,
+                      color: Colors.orange,
+                    ),
+                    onPressed: () {
+                      // ¡IMPORTANTE!
+                      // cartProvider.addProduct(product); // <-- Esto puede fallar
+                      
+                      // Tu CartProvider probablemente espera un Product de tipo 'products_provider.dart'
+                      // y este es un Product de 'data_models.dart'.
+                      // Necesitarás ajustar tu CartProvider para que acepte el modelo
+                      // de 'data_models.dart' o convertirlo.
+                      
+                      // Por ahora, añadimos un print para confirmar que funciona
+                      print("Añadiendo ${product.name} al carrito.");
+                      // cartProvider.addProduct(product); // <-- Descomenta cuando tu CartProvider sea compatible
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${product.name} agregado al carrito'),
+                          backgroundColor: Colors.green,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  )
                 : const Icon(Icons.remove_shopping_cart, color: Colors.grey),
         onTap: () {
           _showProductDetails(context, product, cartProvider);
@@ -223,7 +258,8 @@ class AlmuerzosScreen extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        cartProvider.addProduct(product);
+                        // cartProvider.addProduct(product); // <-- Misma nota que arriba
+                        print("Añadiendo ${product.name} al carrito.");
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

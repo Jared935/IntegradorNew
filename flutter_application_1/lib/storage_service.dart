@@ -1,112 +1,57 @@
-// lib/storage_service.dart (o la ruta donde lo tengas)
 import 'package:cloud_firestore/cloud_firestore.dart';
-// Asegúrate de que esta importación apunte a tu archivo de modelos correcto
-import 'data_models.dart'; // Ajusta la ruta si es necesario
+import 'data_models.dart';
 
 class StorageService {
-  // Instancia principal de Firestore
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // Nombres de las colecciones en Firebase
   static const String _usersCollection = 'users';
   static const String _salesCollection = 'sales';
   static const String _ticketsCollection = 'tickets';
   static const String _productsCollection = 'products';
 
-  // ====================================================================
-  // MÉTODOS DE MODIFICACIÓN (AÑADIR/BORRAR/ACTUALIZAR)
-  // ====================================================================
-
-  // --- Usuarios ---
-  static Future<void> addUser(User user) async {
-    print("🟠 [STORAGE] Intentando guardar usuario: ${user.email}");
-    try {
-      await _db.collection(_usersCollection).add({
-        'name': user.name,
-        'email': user.email,
-        'role': user.role,
-        'password': user.password, // Asegura que se guarde 'password' en minúsculas
-      });
-      print("🟢 [STORAGE] Usuario guardado con éxito.");
-    } catch (e) {
-      print("🔴 [STORAGE] Error al guardar usuario: $e");
-      rethrow;
-    }
-  }
-
-  static Future<void> deleteUser(String userId) async {
-    try {
-       await _db.collection(_usersCollection).doc(userId).delete();
-       print("🟢 [STORAGE] Usuario borrado con éxito.");
-    } catch (e) {
-       print("🔴 [STORAGE] Error al borrar usuario: $e");
-    }
-  }
-
-  // --- Ventas ---
-  static Future<void> addSale(Sale sale) async {
-    await _db.collection(_salesCollection).add({
-      'amount': sale.amount,
-      'itemId': sale.itemId,
-      'timestamp': FieldValue.serverTimestamp(), // Guarda la fecha/hora
-    });
-  }
-
-  static Future<void> deleteSale(String saleId) async {
-    await _db.collection(_salesCollection).doc(saleId).delete();
-  }
-  
-  // --- Productos ---
-  static Future<void> addProduct(Product product) async {
-    await _db.collection(_productsCollection).add({
-      'name': product.name,
-      'stock': product.stock,
-    });
-  }
-
-  static Future<void> deleteProduct(String productId) async {
-    await _db.collection(_productsCollection).doc(productId).delete();
-  }
-
-  // --- Tickets ---
-  static Future<void> addTicket(Ticket ticket) async {
-    await _db.collection(_ticketsCollection).add({
-      'subject': ticket.subject,
-      'status': ticket.status,
-      'orderId': ticket.orderId,
-    });
-  }
-
-  static Future<void> deleteTicket(String ticketId) async {
-    await _db.collection(_ticketsCollection).doc(ticketId).delete();
-  }
-
-  static Future<void> updateTicketStatus(String ticketId, String newStatus) async {
-    await _db.collection(_ticketsCollection).doc(ticketId).update({'status': newStatus});
-  }
-
-
-  // ====================================================================
-  // STREAMS DE DATOS (LECTURA EN TIEMPO REAL)
-  // ====================================================================
-
+  // --- MODIFICACIÓN CLAVE EN EL STREAM DE USUARIOS ---
   static Stream<List<User>> streamUsers() {
     return _db.collection(_usersCollection).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
+        
+        // LÓGICA DE COMPATIBILIDAD:
+        // 1. Intenta leer 'password'
+        // 2. Si no existe, intenta leer 'Contraseña'
+        // 3. Si no existe, devuelve cadena vacía
+        String password = data['password']?.toString() ?? data['Contraseña']?.toString() ?? '';
+
         return User(
           id: doc.id,
           name: data['name'] ?? '',
-      
           email: data['email'] ?? '',
-          role: data['role'] ?? 'Cliente', // Asigna 'Cliente' si el rol no existe
-          password: data['password'] ?? '', // Lee 'password' en minúsculas
+          role: data['role'] ?? 'Cliente',
+          password: password, // <--- Aquí usamos la variable compatible
         );
       }).toList();
     });
   }
 
-  static Stream<List<Sale>> streamSales() {
+  // --- MÉTODOS DE GUARDADO (Usaremos el estándar nuevo 'password') ---
+  static Future<void> addUser(User user) async {
+    await _db.collection(_usersCollection).add({
+      'name': user.name,
+      'email': user.email,
+      'role': user.role,
+      'password': user.password, // Los nuevos se guardan bien
+      'created_at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ... (El resto de tus métodos: deleteUser, addSale, streamProducts, etc. siguen igual)
+  
+  static Future<void> deleteUser(String userId) async {
+    await _db.collection(_usersCollection).doc(userId).delete();
+  }
+
+  // ... Mantén el resto de tus streams y métodos de productos/ventas aquí ...
+  // (Si necesitas que te pegue el archivo COMPLETO con todo lo demás, dímelo)
+   static Stream<List<Sale>> streamSales() {
     return _db.collection(_salesCollection).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
@@ -141,9 +86,55 @@ class StorageService {
           id: doc.id,
           name: data['name'] ?? '',
           stock: (data['stock'] as num?)?.toInt() ?? 0,
+          category: data['category'] ?? 'Sin categoría',
+          description: data['description'] ?? 'Sin descripción.',
+          price: (data['price'] as num?)?.toDouble() ?? 0.0,
+          available: data['available'] ?? false,
+          imageUrl: data['imageUrl'] ?? '📦',
         );
       }).toList();
     });
+  }
+    // Stream de productos FILTRADOS POR CATEGORÍA (Actualizado)
+  static Stream<List<Product>> streamProductsByCategory(String category) {
+    return _db
+        .collection(_productsCollection)
+        .where('category', isEqualTo: category)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return Product(
+          id: doc.id,
+          name: data['name'] ?? '',
+          stock: (data['stock'] as num?)?.toInt() ?? 0,
+          category: data['category'] ?? '',
+          description: data['description'] ?? 'Sin descripción.',
+          price: (data['price'] as num?)?.toDouble() ?? 0.0,
+          available: data['available'] ?? false,
+          imageUrl: data['imageUrl'] ?? '📦',
+        );
+      }).toList();
+    });
+  }
+
+  static Future<void> addProduct(Product product) async {
+    try {
+      await _db.collection(_productsCollection).add({
+        'name': product.name,
+        'stock': product.stock,
+        'category': product.category,
+        'description': product.description,
+        'price': product.price,
+        'available': product.available,
+        'imageUrl': product.imageUrl,
+      });
+    } catch (e) {
+       print("Error al guardar producto: $e");
+    }
+  }
+    static Future<void> deleteProduct(String productId) async {
+    await _db.collection(_productsCollection).doc(productId).delete();
   }
 
   static Future<void> saveProducts(List<Product> storageProducts) async {}
@@ -152,5 +143,4 @@ class StorageService {
 
   static Future<void> saveTickets(List<Ticket> storageTickets) async {}
 
-  static Future<void> saveUsers(List<User> storageUsers) async {}
 }

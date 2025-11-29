@@ -1,31 +1,28 @@
-// customer_app/screens/login_screen.dart
+import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-// ASEGÚRATE QUE ESTA RUTA SEA CORRECTA PARA TU PROYECTO
-import 'package:flutter_application_1/storage_service.dart';
-import 'package:flutter_application_1/admin_login.dart'; // Ajusta la ruta si es necesario
+import 'package:flutter/services.dart';
 
-// --- Servicio de Autenticación para Clientes ---
+// --- LIBRERÍAS DE ANIMACIÓN ---
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:glassmorphism/glassmorphism.dart';
+
+// --- TUS IMPORTACIONES ---
+import 'package:flutter_application_1/storage_service.dart';
+import 'package:flutter_application_1/admin_login.dart';
+
+// --- SERVICIO DE AUTH ---
 class CustomerAuthService {
   static Future<bool> login(String email, String password) async {
     try {
-      // 1. Obtiene la lista actualizada de usuarios desde Firestore
       final userList = await StorageService.streamUsers().first;
-
-      // 2. Busca si existe un usuario que coincida en email, contraseña Y rol de Cliente
-      final userExists = userList.any((u) => 
-          u.email == email && 
-          u.password == password && 
-          u.role == 'Cliente' // ¡Importante! Solo permite entrar a clientes
-      );
-
-      return userExists;
+      return userList.any((u) => u.email == email && u.password == password && u.role == 'Cliente');
     } catch (e) {
-      print("Error en login cliente: $e");
       return false;
     }
   }
 }
-// ----------------------------------------------
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -34,321 +31,465 @@ class CustomerLoginScreen extends StatefulWidget {
   State<CustomerLoginScreen> createState() => _CustomerLoginScreenState();
 }
 
-class _CustomerLoginScreenState extends State<CustomerLoginScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-  bool _obscurePassword = true;
-  
-  // Variable para controlar el estado de carga (agregada porque faltaba en tu snippet)
+class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-  FocusNode _usernameFocusNode = FocusNode();
-  FocusNode _passwordFocusNode = FocusNode();
+  void _handleLogin() async {
+    HapticFeedback.heavyImpact();
+    FocusScope.of(context).unfocus();
+    setState(() => _isLoading = true);
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      _showSnack('Faltan datos de acceso.', Colors.orangeAccent);
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    final success = await CustomerAuthService.login(email, password);
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.pushReplacementNamed(context, '/menu');
+    } else {
+       HapticFeedback.vibrate();
+      _showSnack('ACCESO DENEGADO. Credenciales inválidas.', Colors.redAccent);
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showSnack(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)),
+      backgroundColor: color.withOpacity(0.9),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const deepDark = Color(0xFF0A0A0A);
+
+    return Scaffold(
+      backgroundColor: deepDark,
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          // 1. FONDO: Gradiente
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF000000), Color(0xFF1A0F00)],
+              ),
+            ),
+          ),
+
+          // 2. FONDO: Partículas Nativas
+          const _AnimatedParticles(),
+
+          // 3. CONTENIDO
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // --- NUEVO LOGO REACTIVO ---
+                    const _ReactiveLogo(),
+
+                    const SizedBox(height: 30),
+
+                    // --- TEXTO TIPO CONSOLA ---
+                    SizedBox(
+                      height: 40,
+                      child: AnimatedTextKit(
+                        animatedTexts: [
+                          TyperAnimatedText(
+                            '¡Bienvenido a WolfCoffee!',
+                            textStyle: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24.0,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
+                            speed: const Duration(milliseconds: 80),
+                          ),
+                        ],
+                        totalRepeatCount: 1,
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    // --- INPUTS ---
+                    _CyberTextField(
+                      controller: _emailController,
+                      icon: Icons.alternate_email,
+                      hint: "IDENTIFICADOR (EMAIL)",
+                      keyboardType: TextInputType.emailAddress,
+                    ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.3, end: 0, curve: Curves.easeOutCirc),
+
+                    const SizedBox(height: 20),
+
+                    _CyberTextField(
+                      controller: _passwordController,
+                      icon: Icons.lock_outline,
+                      hint: "CÓDIGO DE ACCESO",
+                      isPassword: true,
+                    ).animate(delay: 200.ms).fadeIn(duration: 600.ms).slideY(begin: 0.3, end: 0, curve: Curves.easeOutCirc),
+
+                    const SizedBox(height: 40),
+
+                    // --- BOTÓN ---
+                    _CyberButton(
+                      text: "INICIAR ENLACE",
+                      isLoading: _isLoading,
+                      onTap: _handleLogin,
+                    ).animate(delay: 400.ms).fadeIn(duration: 600.ms).scale(begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack),
+
+                    const SizedBox(height: 30),
+                    
+                    // --- LINKS ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => Navigator.pushNamed(context, '/register'),
+                          icon: const Icon(Icons.person_add_alt_1, color: Colors.white54),
+                          label: const Text("CREAR NUEVA ID", style: TextStyle(color: Colors.white70, letterSpacing: 1)),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.settings_suggest, color: Colors.white30),
+                          tooltip: "Acceso Admin",
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminLoginScreen())),
+                        )
+                      ],
+                    ).animate(delay: 600.ms).fadeIn(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// --- WIDGETS PERSONALIZADOS ---
+// ============================================================================
+
+// 1. LOGO REACTIVO (Circular y con Borde Vivo)
+class _ReactiveLogo extends StatefulWidget {
+  const _ReactiveLogo();
+
+  @override
+  State<_ReactiveLogo> createState() => _ReactiveLogoState();
+}
+
+class _ReactiveLogoState extends State<_ReactiveLogo> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _isPressed = false;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
+    // Animación de respiración constante
+    _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
-    );
-
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
-    );
-
-    _animationController.forward();
-
-    _usernameFocusNode.addListener(() => setState(() {}));
-    _passwordFocusNode.addListener(() => setState(() {}));
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
-    _usernameFocusNode.dispose();
-    _passwordFocusNode.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  // --- Nueva función para manejar el login ---
-  void _handleLogin() async {
-    // Ocultar teclado
-    FocusScope.of(context).unfocus();
+  @override
+  Widget build(BuildContext context) {
+    const cyberOrange = Color(0xFFFF8F00);
 
-    setState(() {
-      _isLoading = true;
-    });
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          // Valores animados para el efecto "respiración"
+          final glowValue = _controller.value; 
+          final borderSize = _isPressed ? 6.0 : 3.0 + (glowValue * 1.5);
+          final shadowSpread = _isPressed ? 2.0 : 5.0 + (glowValue * 10);
+          final shadowColor = _isPressed ? Colors.white : cyberOrange;
 
-    final email = _usernameController.text.trim();
-    final password = _passwordController.text;
+          return AnimatedScale(
+            scale: _isPressed ? 0.95 : 1.0,
+            duration: const Duration(milliseconds: 100),
+            child: Container(
+              height: 150,
+              width: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black, // Fondo negro para que resalte la imagen
+                border: Border.all(
+                  color: shadowColor.withOpacity(0.8),
+                  width: borderSize,
+                ),
+                boxShadow: [
+                  // Brillo externo
+                  BoxShadow(
+                    color: cyberOrange.withOpacity(0.4 + (glowValue * 0.2)),
+                    blurRadius: 20 + (glowValue * 10),
+                    spreadRadius: shadowSpread,
+                  ),
+                  // Brillo interno sutil
+                  BoxShadow(
+                    color: cyberOrange.withOpacity(0.2),
+                    blurRadius: 10,
+                    spreadRadius: -5,
+                  )
+                ],
+              ),
+              child: ClipOval(
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0), // Espacio entre borde e imagen
+                  child: Image.asset(
+                    'assets/images/wolf_logo.png',
+                    fit: BoxFit.contain, // Contain asegura que se vea todo el logo
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, ingrese usuario y contraseña.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      setState(() { _isLoading = false; });
-      return;
-    }
+// 2. SISTEMA DE PARTÍCULAS NATIVO
+class _AnimatedParticles extends StatefulWidget {
+  const _AnimatedParticles();
 
-    // Llamada al servicio de autenticación real
-    final bool success = await CustomerAuthService.login(email, password);
+  @override
+  State<_AnimatedParticles> createState() => _AnimatedParticlesState();
+}
 
-    if (!mounted) return;
+class _AnimatedParticlesState extends State<_AnimatedParticles> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  final List<_Particle> _particles = [];
+  final Random _rnd = Random();
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (success) {
-      // Login exitoso: Navegar al menú
-      Navigator.pushReplacementNamed(context, '/menu');
-    } else {
-      // Login fallido: Mostrar error
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Credenciales incorrectas o no es una cuenta de cliente.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+    for (int i = 0; i < 50; i++) {
+      _particles.add(_Particle(_rnd));
     }
   }
-  // -------------------------------------------
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black87,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top,
-            child: Column(
-              children: [
-                // --- Botón para Admin (Esquina superior derecha) ---
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: SlideTransition(
-                        position: _slideAnimation,
-                        child: IconButton(
-                          icon: const Icon(Icons.admin_panel_settings, color: Colors.white70, size: 28),
-                          tooltip: 'Acceso Administrador',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const AdminLoginScreen()),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const Spacer(flex: 1),
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return CustomPaint(
+          painter: _ParticlePainter(_particles, _controller.value),
+          size: Size.infinite,
+        );
+      },
+    );
+  }
+}
 
-                // --- Logo del Lobo Chef ---
-                FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: Container(
-                      height: 180,
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.brown.withOpacity(0.5),
-                            blurRadius: 15,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                        shape: BoxShape.circle,
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/wolf_logo.png',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 30),
+class _Particle {
+  double x, y, size, speed, opacity;
+  _Particle(Random rnd)
+      : x = rnd.nextDouble(),
+        y = rnd.nextDouble(),
+        size = rnd.nextDouble() * 3 + 1,
+        speed = rnd.nextDouble() * 0.002 + 0.001,
+        opacity = rnd.nextDouble() * 0.5 + 0.1;
 
-                // --- Texto de Bienvenida ---
-                FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: const Text(
-                      "¡Bienvenido, a WolfCoffe!",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [Shadow(offset: Offset(1, 1), blurRadius: 3, color: Colors.black)],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 50),
+  void update() {
+    y -= speed;
+    if (y < 0) y = 1.0;
+  }
+}
 
-                // --- Campo de Usuario ---
-                _buildInputField(
-                  "Email", // Cambiado a "Email" para ser más claro
-                  controller: _usernameController,
-                  icon: Icons.email_outlined,
-                  focusNode: _usernameFocusNode,
-                  keyboardType: TextInputType.emailAddress, // Teclado de email
-                ),
-                const SizedBox(height: 25),
+class _ParticlePainter extends CustomPainter {
+  final List<_Particle> particles;
+  final double animationValue;
 
-                // --- Campo de Contraseña ---
-                _buildInputField(
-                  "Contraseña",
-                  controller: _passwordController,
-                  isPassword: true,
-                  icon: Icons.lock_outline,
-                  focusNode: _passwordFocusNode,
-                ),
-                const SizedBox(height: 40),
+  _ParticlePainter(this.particles, this.animationValue);
 
-                // --- Botón de Iniciar Sesión ---
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin, // Conectado a la nueva función
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color.fromARGB(255, 94, 53, 39),
-                    padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    elevation: 8,
-                    shadowColor: Colors.brown.shade800,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text(
-                          "Iniciar sesión",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                            shadows: [Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black54)],
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 25),
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0xFFFF8F00);
 
-                // --- Botón para Crear Cuenta ---
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/register');
-                  },
-                  child: const Text(
-                    "¿No tienes cuenta? Crea una",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.underline,
-                      decorationColor: Colors.white54,
-                      shadows: [Shadow(offset: Offset(0.5, 0.5), blurRadius: 1, color: Colors.black)],
-                    ),
-                  ),
+    for (var p in particles) {
+      p.update();
+      paint.color = const Color(0xFFFF8F00).withOpacity(p.opacity);
+      canvas.drawCircle(Offset(p.x * size.width, p.y * size.height), p.size, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// 3. Input Cyberpunk
+class _CyberTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final IconData icon;
+  final String hint;
+  final bool isPassword;
+  final TextInputType keyboardType;
+
+  const _CyberTextField({
+    required this.controller,
+    required this.icon,
+    required this.hint,
+    this.isPassword = false,
+    this.keyboardType = TextInputType.text,
+  });
+
+  @override
+  State<_CyberTextField> createState() => _CyberTextFieldState();
+}
+
+class _CyberTextFieldState extends State<_CyberTextField> {
+  bool _isFocused = false;
+  bool _obscure = true;
+
+  @override
+  Widget build(BuildContext context) {
+    const cyberOrange = Color(0xFFFF8F00);
+
+    return FocusScope(
+      child: Focus(
+        onFocusChange: (focus) => setState(() => _isFocused = focus),
+        child: GlassmorphicContainer(
+          width: double.infinity,
+          height: 60,
+          borderRadius: 12,
+          blur: 20,
+          alignment: Alignment.center,
+          border: 1.5,
+          linearGradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)],
+              stops: const [0.1, 1],
+          ),
+          borderGradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _isFocused 
+              ? [cyberOrange, Colors.orangeAccent] 
+              : [Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.1)],
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            decoration: BoxDecoration(
+              boxShadow: _isFocused ? [BoxShadow(color: cyberOrange.withOpacity(0.2), blurRadius: 20, spreadRadius: 0)] : []
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: widget.controller,
+                obscureText: widget.isPassword && _obscure,
+                keyboardType: widget.keyboardType,
+                style: const TextStyle(color: Colors.white, letterSpacing: 1.1),
+                cursorColor: cyberOrange,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  icon: Icon(widget.icon, color: _isFocused ? cyberOrange : Colors.white38),
+                  hintText: widget.hint,
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), letterSpacing: 1.5, fontSize: 14),
+                  suffixIcon: widget.isPassword ? IconButton(
+                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: Colors.white30),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ) : null,
                 ),
-                const Spacer(flex: 2),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildInputField(
-    String label, {
-    TextEditingController? controller,
-    bool isPassword = false,
-    IconData? icon,
-    FocusNode? focusNode,
-    TextInputType? keyboardType, // Parámetro opcional añadido
-  }) {
-    bool isFocused = focusNode?.hasFocus ?? false;
+// 4. Botón Cyberpunk
+class _CyberButton extends StatelessWidget {
+  final String text;
+  final bool isLoading;
+  final VoidCallback onTap;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+  const _CyberButton({required this.text, required this.isLoading, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    const cyberOrange = Color(0xFFD84315);
+    const cyberGold = Color(0xFFFF8F00);
+
+    return Container(
+      height: 55,
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey.shade900.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: isFocused
-            ? [
-                BoxShadow(
-                  color: Colors.brown.shade300.withOpacity(0.5),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 5,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(colors: [cyberOrange, cyberGold]),
+        boxShadow: [
+          BoxShadow(color: cyberGold.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 5))
+        ],
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword && _obscurePassword,
-        focusNode: focusNode,
-        keyboardType: keyboardType,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(
-            color: isFocused ? Colors.brown.shade200 : Colors.white54,
-            fontSize: 16,
-          ),
-          prefixIcon: icon != null
-              ? Icon(icon, color: isFocused ? Colors.brown.shade300 : Colors.white54)
-              : null,
-          suffixIcon: isPassword
-              ? IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                    color: isFocused ? Colors.brown.shade300 : Colors.white54,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLoading ? null : onTap,
+          borderRadius: BorderRadius.circular(12),
+          splashColor: Colors.white24,
+          child: Center(
+            child: isLoading
+                ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Text(
+                    text,
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          ),
         ),
-        cursorColor: Colors.brown.shade300,
       ),
-    );
+    )
+    .animate(onPlay: (controller) => controller.repeat())
+    .shimmer(duration: 2000.ms, color: Colors.white54, angle: 45);
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../widgets/category_tile.dart';
-import '../widgets/cart_badge.dart';
+// Asegúrate de que estos widgets existan en tu proyecto.
+// Si no los tienes, avísame y te paso el código de ellos también.
+import '../widgets/category_tile.dart'; 
+import '../widgets/cart_badge.dart'; 
 
 class MainMenuScreen extends StatelessWidget {
   const MainMenuScreen({super.key});
@@ -8,12 +10,15 @@ class MainMenuScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.orange[50],
+      backgroundColor: Colors.orange[50], // Fondo suave
+      
+      // --- BARRA SUPERIOR (APPBAR) ---
       appBar: AppBar(
         backgroundColor: Colors.brown,
+        elevation: 0,
         title: const Row(
           children: [
-            Icon(Icons.local_cafe, color: Colors.orange),
+            Icon(Icons.local_cafe, color: Colors.orange), // Icono pequeño
             SizedBox(width: 8),
             Text(
               "WolfCoffee",
@@ -24,72 +29,79 @@ class MainMenuScreen extends StatelessWidget {
             ),
           ],
         ),
+        // Botón del menú (hamburguesa)
         leading: Builder(
-          builder:
-              (context) => IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
+        // Iconos de la derecha (Buscar y Carrito)
         actions: [
           IconButton(
             icon: const Icon(Icons.search, color: Colors.white),
+            tooltip: 'Buscar productos',
             onPressed: () {
               Navigator.pushNamed(context, '/search');
             },
-            tooltip: 'Buscar productos',
           ),
-          CartBadge(
+          CartBadge( // Widget personalizado del carrito con contador
             icon: const Icon(Icons.shopping_cart, color: Colors.white),
             onPressed: () {
               Navigator.pushNamed(context, '/cart');
             },
           ),
+          const SizedBox(width: 10),
         ],
       ),
+
+      // --- MENÚ LATERAL (DRAWER) ---
       drawer: _buildDrawer(context),
-      body: _buildBody(),
+
+      // --- CUERPO DE LA PANTALLA ---
+      body: _buildBody(context),
     );
   }
 
+  // Función para construir el menú lateral
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
       child: Column(
         children: [
-          // Header del drawer
+          // 1. Encabezado con degradado
           Container(
             width: double.infinity,
-            height: 180,
+            height: 200,
             decoration: const BoxDecoration(
               color: Colors.brown,
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Colors.brown, Colors.orange],
+                colors: [Color(0xFF5D4037), Colors.orange], // Degradado Café -> Naranja
               ),
             ),
-            child: Column(
+            child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const CircleAvatar(
-                  radius: 40,
+                CircleAvatar(
+                  radius: 45,
                   backgroundColor: Colors.white,
                   child: Icon(Icons.local_cafe, size: 50, color: Colors.brown),
                 ),
-                const SizedBox(height: 16),
-                const Text(
+                SizedBox(height: 15),
+                Text(
                   'WolfCoffee',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 5),
                 Text(
                   'Bienvenido/a',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white70,
                     fontSize: 14,
                   ),
                 ),
@@ -97,60 +109,90 @@ class MainMenuScreen extends StatelessWidget {
             ),
           ),
 
-          // Opciones del menú
+          // 2. Lista de Opciones
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
+                const SizedBox(height: 10),
                 _buildDrawerItem(
-                  context,
-                  Icons.home,
-                  'Inicio',
-                  () => Navigator.pop(context),
+                  icon: Icons.home,
+                  text: 'Inicio',
+                  onTap: () => Navigator.pop(context),
                 ),
-                _buildDrawerItem(context, Icons.search, 'Buscar Productos', () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/search');
-                }),
                 _buildDrawerItem(
-                  context,
-                  Icons.shopping_cart,
-                  'Mi Carrito',
-                  () {
+                  icon: Icons.search,
+                  text: 'Buscar Productos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, '/search');
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.shopping_cart,
+                  text: 'Mi Carrito',
+                  onTap: () {
                     Navigator.pop(context);
                     Navigator.pushNamed(context, '/cart');
                   },
                 ),
-                _buildDrawerItem(context, Icons.person, 'Mi Perfil', () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/profile');
-                }),
-                _buildDrawerItem(context, Icons.settings, 'Ajustes', () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/settings');
-                }),
-                const Divider(),
                 _buildDrawerItem(
-                  context,
-                  Icons.history,
-                  'Historial de Pedidos',
-                  () {
+                  icon: Icons.person,
+                  text: 'Mi Perfil',
+                  onTap: () {
                     Navigator.pop(context);
-                    _showComingSoon(context);
+                    Navigator.pushNamed(context, '/profile');
                   },
                 ),
-                _buildDrawerItem(context, Icons.favorite, 'Favoritos', () {
-                  Navigator.pop(context);
-                  _showComingSoon(context);
-                }),
-                const Divider(),
-                _buildDrawerItem(context, Icons.logout, 'Cerrar Sesión', () {
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/login',
-                    (route) => false,
-                  );
-                }, color: Colors.red),
+                _buildDrawerItem(
+                  icon: Icons.settings,
+                  text: 'Ajustes',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, '/settings');
+                  },
+                ),
+                
+                const Divider(), // Línea divisoria
+                
+                _buildDrawerItem(
+                  icon: Icons.history,
+                  text: 'Historial de Pedidos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigator.pushNamed(context, '/history');
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.favorite,
+                  text: 'Favoritos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigator.pushNamed(context, '/favorites');
+                  },
+                ),
+                
+                const Divider(), // Línea divisoria
+
+                // --- BOTÓN CERRAR SESIÓN ---
+                ListTile(
+                  leading: const Icon(Icons.exit_to_app, color: Colors.red),
+                  title: const Text(
+                    'Cerrar Sesión',
+                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  ),
+                  onTap: () {
+                    // Cierra el drawer
+                    Navigator.pop(context);
+                    
+                    // Navega al login y BORRA el historial para que no puedan volver atrás
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/customer_login', 
+                      (route) => false,
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -159,21 +201,24 @@ class MainMenuScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDrawerItem(
-    BuildContext context,
-    IconData icon,
-    String title,
-    VoidCallback onTap, {
-    Color? color,
+  // Widget auxiliar para los items del menú
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: color ?? Colors.brown),
-      title: Text(title, style: TextStyle(color: color ?? Colors.black87)),
+      leading: Icon(icon, color: Colors.brown[700]),
+      title: Text(
+        text,
+        style: TextStyle(color: Colors.brown[900], fontSize: 16),
+      ),
       onTap: onTap,
     );
   }
 
-  Widget _buildBody() {
+  // Función para construir el cuerpo de la página
+  Widget _buildBody(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -185,16 +230,16 @@ class MainMenuScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
+                colors: [Color(0xFF5D4037), Color(0xFF8D6E63)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Colors.brown, Colors.orange],
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.brown.withOpacity(0.3),
+                  color: Colors.brown.withOpacity(0.4),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
@@ -202,7 +247,7 @@ class MainMenuScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '¡Bienvenido a WolfCoffee! ☕',
+                  '¡Hola, Café Lover! ☕',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -211,29 +256,27 @@ class MainMenuScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Disfruta de nuestros deliciosos productos recién preparados',
+                  '¿Qué se te antoja hoy? Tenemos productos recién preparados.',
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-
-          // Título de categorías
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Nuestro Menú',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.brown,
-              ),
+          
+          const SizedBox(height: 25),
+          
+          // Título de secciones
+          const Text(
+            'Categorías',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4E342E),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 15),
 
-          // Lista de categorías
+          // Lista de Categorías
           Expanded(
             child: ListView(
               children: const [
@@ -246,16 +289,6 @@ class MainMenuScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('¡Próximamente! Esta función estará disponible pronto.'),
-        backgroundColor: Colors.orange,
-        duration: Duration(seconds: 2),
       ),
     );
   }
