@@ -1,64 +1,18 @@
-// sales_screen.dart
 import 'package:flutter/material.dart';
 import 'storage_service.dart';
 import 'data_models.dart' as data_models;
-
-class Sale {
-  String id;
-  double amount;
-  String itemId; 
-  Sale(this.id, this.amount, this.itemId);
-}
-
-class SalesDataService {
-  static final List<Sale> _sales = []; 
-  
-  static List<Sale> get saleList => _sales;
-  static double get totalSalesAmount {
-    return _sales.fold(0.0, (sum, sale) => sum + sale.amount);
-  }
-
-  static final Stream<List<Sale>> saleStream = StorageService.streamSales().map((loadedSales) {
-    _sales.clear();
-    final screenSales = loadedSales.map((s) => Sale(s.id, s.amount, s.itemId)).toList();
-    _sales.addAll(screenSales);
-    return screenSales;
-  });
-
-  static Future<void> initialize() async {} 
-  
-  static Future<void> save() async {
-    final storageSales = _sales.map((s) => data_models.Sale(id: s.id, amount: s.amount, itemId: s.itemId)).toList();
-    await StorageService.saveSales(storageSales);
-  }
-}
 
 class SalesScreen extends StatefulWidget {
   const SalesScreen({super.key});
 
   @override
-  State<SalesScreen> createState() => _SalesScreenState(); 
+  State<SalesScreen> createState() => _SalesScreenState();
 }
 
 class _SalesScreenState extends State<SalesScreen> {
 
-  void _deleteSale(int index) {
-    final deletedSale = SalesDataService._sales.removeAt(index);
-    
-    SalesDataService.save(); 
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Venta ${deletedSale.id} eliminada.'),
-        action: SnackBarAction(
-          label: 'DESHACER',
-          onPressed: () {
-            SalesDataService._sales.insert(index, deletedSale);
-            SalesDataService.save();
-          },
-        ),
-      ),
-    );
+  void _deleteSale(String saleId) {
+    StorageService.deleteSale(saleId);
   }
 
   void _addSale() {
@@ -79,7 +33,7 @@ class _SalesScreenState extends State<SalesScreen> {
               ),
               TextField(
                 controller: amountController,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(labelText: 'Monto Total (\$)', prefixText: '\$'),
               ),
             ],
@@ -91,13 +45,20 @@ class _SalesScreenState extends State<SalesScreen> {
             ),
             FilledButton(
               onPressed: () {
-                final String itemId = itemIdController.text;
+                final String itemId = itemIdController.text.trim();
                 final double? amount = double.tryParse(amountController.text);
 
                 if (itemId.isNotEmpty && amount != null && amount > 0) {
-                  String newId = 'V-202500${SalesDataService._sales.length + 1}';
-                  SalesDataService._sales.add(Sale(newId, amount, itemId)); 
-                  SalesDataService.save();
+                  // 1. Crear objeto
+                  final newSale = data_models.Sale(
+                    id: '', 
+                    amount: amount, 
+                    itemId: itemId
+                  );
+                  
+                  // 2. Guardar en Firebase
+                  StorageService.addSale(newSale);
+                  
                   Navigator.of(context).pop();
                 } 
               },
@@ -115,15 +76,16 @@ class _SalesScreenState extends State<SalesScreen> {
       appBar: AppBar(
         title: const Text('Gestión de Ventas Diarias'),
         backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<List<Sale>>(
-        stream: SalesDataService.saleStream,
+      body: StreamBuilder<List<data_models.Sale>>(
+        stream: StorageService.streamSales(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
           final liveSales = snapshot.data ?? [];
           
@@ -143,10 +105,10 @@ class _SalesScreenState extends State<SalesScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.shopping_cart, color: Colors.blue),
                   title: Text(
-                    'Venta #${sale.id}',
+                    'Venta #${sale.id.substring(0, 6)}...', // ID corto
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('Artículo ID: ${sale.itemId}'), 
+                  subtitle: Text('Artículo: ${sale.itemId}'), 
                   
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -155,16 +117,14 @@ class _SalesScreenState extends State<SalesScreen> {
                         '\$${sale.amount.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                          fontSize: 16,
                           color: Colors.green,
                         ),
                       ),
                       const SizedBox(width: 10),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          _deleteSale(index); 
-                        },
+                        onPressed: () => _deleteSale(sale.id),
                       ),
                     ],
                   ),

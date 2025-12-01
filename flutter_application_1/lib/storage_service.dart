@@ -143,4 +143,14 @@ class StorageService {
 
   static Future<void> saveTickets(List<Ticket> storageTickets) async {}
 
+  static void addSale(Sale newSale) {}
+
+  static void deleteSale(String saleId) {}
+
+  static void updateTicketStatus(String id, String newStatus) {}
+
+  static void deleteTicket(String ticketId) {}
+
+  static void addTicket(Ticket newTicket) {}
+
 }

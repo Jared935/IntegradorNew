@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-// Asegúrate de que este archivo exista y tenga la clase User
 import 'admin_data_models.dart' as admin_models;
 
 class AdminStorageService {
